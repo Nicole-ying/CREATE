@@ -125,12 +125,15 @@ class RewardComponentStatsCallback(BaseCallback):
         }
 
 
-def _make_env(env_id, reward_fn, max_progress_steps, seed, rank, monitor_dir, reward_clip, error_fallback):
+def _make_env(env_id, reward_fn, max_progress_steps, seed, rank, monitor_dir, reward_clip, error_fallback, env_kwargs=None):
     """Module-level env factory for SubprocVecEnv (must be picklable)."""
     import gymnasium as gym
     from training.reward_wrapper import RewardOverrideWrapper
     from stable_baselines3.common.monitor import Monitor
-    env = gym.make(env_id)
+    if env_kwargs:
+        env = gym.make(env_id, **env_kwargs)
+    else:
+        env = gym.make(env_id)
     env.reset(seed=seed + rank)
     env.action_space.seed(seed + rank)
     info_keywords = ()
@@ -151,12 +154,12 @@ def _make_env(env_id, reward_fn, max_progress_steps, seed, rank, monitor_dir, re
     return env
 
 
-def build_env_fns(env_id, reward_fn, max_progress_steps, seed, n_envs, monitor_dir, reward_clip, error_fallback):
+def build_env_fns(env_id, reward_fn, max_progress_steps, seed, n_envs, monitor_dir, reward_clip, error_fallback, env_kwargs=None):
     """Return list of env factory functions for SubprocVecEnv."""
     from functools import partial
     fns = []
     for rank in range(n_envs):
-        fns.append(partial(_make_env, env_id, reward_fn, max_progress_steps, seed, rank, str(monitor_dir), reward_clip, error_fallback))
+        fns.append(partial(_make_env, env_id, reward_fn, max_progress_steps, seed, rank, str(monitor_dir), reward_clip, error_fallback, env_kwargs))
     return fns
 
 
@@ -168,6 +171,7 @@ def evaluate_model_on_original_env(
     eval_seed_offset=10000,
     reward_fn=None,
     observation_normalizer=None,
+    env_kwargs=None,
 ):
     """Evaluate using a fixed set of seeds for reproducibility and paired comparison.
 
@@ -185,7 +189,10 @@ def evaluate_model_on_original_env(
                        eval_seed_offset + 0, eval_seed_offset + 1, ..., eval_seed_offset + eval_episodes - 1.
                        Parent and child should use the same eval_seed_offset for paired comparison.
     """
-    env = gym.make(env_id)
+    if env_kwargs:
+        env = gym.make(env_id, **env_kwargs)
+    else:
+        env = gym.make(env_id)
     episode_rewards = []
     episode_lengths = []
     episode_terminated = []  # True = terminated (env-defined end), False = truncated (time limit)
@@ -560,6 +567,7 @@ def main():
     reward_clip = train_cfg.get("reward_clip", 20.0)
     error_fallback = train_cfg.get("error_fallback", "zero")
     max_progress_steps = int(train_cfg.get("max_training_steps_for_progress", total_timesteps))
+    env_kwargs = train_cfg.get("env_kwargs", None)
 
     env_fns = build_env_fns(
         train_cfg["runner_env_id"],
@@ -570,6 +578,7 @@ def main():
         monitor_dir,
         reward_clip,
         error_fallback,
+        env_kwargs,
     )
     env = SubprocVecEnv(env_fns)
     normalize_obs = bool(train_cfg.get("normalize_obs", False))
@@ -651,6 +660,7 @@ def main():
         eval_seed_offset=eval_seed_offset,
         reward_fn=reward_fn,
         observation_normalizer=vec_normalize if normalize_obs else None,
+        env_kwargs=env_kwargs,
     )
     env.close()
     component_summary = component_callback.summary()
