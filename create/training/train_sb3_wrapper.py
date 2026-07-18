@@ -34,8 +34,8 @@ class ConvergenceEarlyStopCallback(BaseCallback):
       3. Minimum training steps completed (safety: avoid false convergence)
     """
 
-    def __init__(self, ev_threshold=0.90, stability_window=10, stability_std=0.01,
-                 min_steps=100_000, check_freq=10_000, verbose=1):
+    def __init__(self, ev_threshold=0.93, stability_window=10, stability_std=0.01,
+                 min_steps=500_000, check_freq=10_000, verbose=1):
         super().__init__()
         self.ev_threshold = ev_threshold
         self.stability_window = stability_window
@@ -691,10 +691,10 @@ def main():
     callbacks = [component_callback]
     if train_cfg.get("early_stop_convergence", False):
         ev_callback = ConvergenceEarlyStopCallback(
-            ev_threshold=float(train_cfg.get("early_stop_ev_threshold", 0.90)),
+            ev_threshold=float(train_cfg.get("early_stop_ev_threshold", 0.93)),
             stability_window=int(train_cfg.get("early_stop_stability_window", 10)),
             stability_std=float(train_cfg.get("early_stop_stability_std", 0.01)),
-            min_steps=int(train_cfg.get("early_stop_min_steps", 100_000)),
+            min_steps=int(train_cfg.get("early_stop_min_steps", 500_000)),
         )
         callbacks.append(ev_callback)
 

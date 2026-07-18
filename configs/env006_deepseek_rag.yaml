@@ -86,10 +86,10 @@ training:
   n_envs: 8
   total_timesteps: 5000000
   early_stop_convergence: true
-  early_stop_ev_threshold: 0.90
+  early_stop_ev_threshold: 0.93
   early_stop_stability_window: 10
   early_stop_stability_std: 0.01
-  early_stop_min_steps: 100000
+  early_stop_min_steps: 500000
   eval_episodes: 20
   eval_seed_offset: 10000
   n_steps: 2048
