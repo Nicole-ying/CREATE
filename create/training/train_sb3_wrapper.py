@@ -25,6 +25,55 @@ def _parse_schedule_value(value):
     return linear_schedule
 
 
+class ConvergenceEarlyStopCallback(BaseCallback):
+    """Stop training when explained_variance has converged.
+
+    Convergence criteria:
+      1. Rolling mean of explained_variance > threshold (default 0.9)
+      2. Rolling std < stability threshold for N consecutive checks (default 10)
+      3. Minimum training steps completed (safety: avoid false convergence)
+    """
+
+    def __init__(self, ev_threshold=0.90, stability_window=10, stability_std=0.01,
+                 min_steps=100_000, check_freq=10_000, verbose=1):
+        super().__init__()
+        self.ev_threshold = ev_threshold
+        self.stability_window = stability_window
+        self.stability_std = stability_std
+        self.min_steps = min_steps
+        self.check_freq = check_freq
+        self.verbose = verbose
+        self._ev_history = []
+
+    def _on_step(self):
+        if self.n_calls % self.check_freq != 0:
+            return True
+        # Access explained_variance from the model's logger
+        if not hasattr(self.model, 'logger') or 'train/explained_variance' not in self.model.logger.name_to_value:
+            return True
+        ev = self.model.logger.name_to_value['train/explained_variance']
+        self._ev_history.append(ev)
+        # Keep only recent history
+        if len(self._ev_history) > self.stability_window * 2:
+            self._ev_history = self._ev_history[-self.stability_window * 2:]
+
+        if len(self._ev_history) < self.stability_window:
+            return True
+        if self.num_timesteps < self.min_steps:
+            return True
+
+        recent = self._ev_history[-self.stability_window:]
+        recent_mean = sum(recent) / len(recent)
+        recent_std = (sum((x - recent_mean) ** 2 for x in recent) / len(recent)) ** 0.5
+
+        if recent_mean > self.ev_threshold and recent_std < self.stability_std:
+            if self.verbose:
+                print(f"\n[ConvergenceEarlyStop] Converged at {self.num_timesteps:,} steps "
+                      f"(ev_mean={recent_mean:.4f}, ev_std={recent_std:.4f})")
+            return False  # Stop training
+        return True
+
+
 class RewardComponentStatsCallback(BaseCallback):
     def __init__(self):
         super().__init__()
@@ -638,7 +687,18 @@ def main():
         _Path(train_cfg["tensorboard_log"]).mkdir(parents=True, exist_ok=True)
         import time as _time
     _train_start = _time.time()
-    model.learn(total_timesteps=total_timesteps, tb_log_name=tb_log_name, callback=component_callback)
+
+    callbacks = [component_callback]
+    if train_cfg.get("early_stop_convergence", False):
+        ev_callback = ConvergenceEarlyStopCallback(
+            ev_threshold=float(train_cfg.get("early_stop_ev_threshold", 0.90)),
+            stability_window=int(train_cfg.get("early_stop_stability_window", 10)),
+            stability_std=float(train_cfg.get("early_stop_stability_std", 0.01)),
+            min_steps=int(train_cfg.get("early_stop_min_steps", 100_000)),
+        )
+        callbacks.append(ev_callback)
+
+    model.learn(total_timesteps=total_timesteps, tb_log_name=tb_log_name, callback=callbacks)
     _train_sec = _time.time() - _train_start
     print(f"Training duration: {_train_sec/60:.1f} min ({_train_sec:.0f} sec)")
     model.save(str(save_dir / "model.zip"))
