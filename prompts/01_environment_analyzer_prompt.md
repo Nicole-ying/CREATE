@@ -32,10 +32,11 @@
 - 不要把 benchmark 名称作为任务类型依据；只能根据目标、动力学形态、动作类型、可用信号和终止机制判断。
 
 允许：
-- 可以输出 reward roles，但这些是“奖励职责”，不是具体公式或固定组件名；
+- 可以输出 reward roles，但这些是”奖励职责”，不是具体公式或固定组件名；
 - 可以说明某个职责需要哪些信号；
 - 可以说明某个职责为什么当前环境不该使用；
 - 可以给出候选 formula operator 名称，如 dense_state_signal、bounded_signal、quadratic_penalty，但不要写最终代码。
+- 终止条件即使无法从 info 直接读取，仍可通过观测信号间接推断。例如：(a) 摔倒/坠毁可从 hull_angle 突变、body 位置骤降、或 contact 信号组合推断；(b) 到达终点可从 agent 持续前进中 episode 突然 truncated 且未检测到摔倒信号推断；(c) 出界可从位置坐标超出合理范围推断。应在”可用于奖励函数的信号”和”role_to_signal_mapping”中列出这些间接可用的推断路径，标注为”derived_possible”。
 
 7 类任务类型只能选一个。选择原则：识别任务的核心目标，附属优化（省燃料、快点到、动作小等）不是多目标。只有当多个目标权重相当、彼此冲突且无法明确区分主次时，才选 multi_objective_task。
 - survival_balance_task: 核心是保持存活/平衡/不倒塌，没有明确到达目标。

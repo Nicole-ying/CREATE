@@ -6,13 +6,15 @@ environment_name_policy:
   do_not_mention_gym_or_gymnasium_id: true
 
 task_description: |
-  This anonymous environment is a 2D bipedal locomotion task over rugged terrain.
-  A two-legged agent must walk forward across uneven ground containing ladders,
-  stumps, pits, and irregular surface undulations. The agent must maintain balance,
-  generate forward progress, and navigate obstacles without falling. The episode
-  ends when the agent falls (body contacts ground) or reaches the far end of the
-  terrain. Unlike smooth-terrain variants, forward velocity alone is insufficient
-  --- the agent must learn adaptive gait patterns and obstacle negotiation.
+  A two-legged agent moves forward across rough ground as far and as efficiently
+  as possible. The terrain includes ladders, tree stumps, pits, and uneven
+  surfaces. The agent receives LIDAR range measurements of the ground ahead to
+  anticipate upcoming obstacles. Each hip and knee joint is independently
+  torque-controlled. The episode ends when the agent falls over or when it
+  reaches the far end of the terrain. Reaching the end, avoiding falls, and
+  minimizing unnecessary joint torque are all desirable. The agent must learn
+  to walk stably on irregular ground, using the LIDAR readings to adjust its
+  gait before encountering obstacles.
 
 action_space:
   type: Box
